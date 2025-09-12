@@ -1,0 +1,390 @@
+---
+title: "Class 1 - Data Analysis in R"
+author: "Tiago Afonso"
+date: today
+format: html
+toc: true
+---
+
+# Class 1 - Data Analysis in `R`
+
+### **Data Collection**
+**WDI - World Development Indicators**
+
+
+```{r}
+#| label: load-libraries
+#| output: false
+
+library(tidyverse)
+library(WDI)
+```
+
+Sample:
+
+| Country | Code |
+|---------|------|
+| 🇩🇪 Germany | DEU |
+| 🇫🇷 France | FRA |
+| 🇧🇪 Belgium | BEL |
+
+Series:
+
+    `GDP (current US$)`
+    `GDP deflator (base year varies by country)`
+    `Tax revenue (% of GDP)`
+    `Population, total`
+    `Mobile cellular subscriptions (per 100 people)`
+
+Time: 1990 - 2024
+
+in `R`:
+
+```{r}
+#| label: load-data
+
+wdi_data <- WDI(
+  country = c("DEU", "FRA", "BEL"),
+  indicator = c(
+    "NY.GDP.MKTP.CD",  # GDP (current US$)
+    "NY.GDP.DEFL.KD.ZG",  # GDP deflator (annual %)
+    "GC.TAX.TOTL.GD.ZS",  # Tax revenue (% of GDP)
+    "SP.POP.TOTL",  # Population, total
+    "IT.CEL.SETS.P2"  # Mobile cellular subscriptions (per 100 people)
+  ),
+  start = 1990,
+  end = 2024,
+  extra = TRUE
+) |>
+  rename(
+    gdp_current_usd = NY.GDP.MKTP.CD,
+    gdp_deflator_annual_pct = NY.GDP.DEFL.KD.ZG,
+    tax_revenue_pct_gdp = GC.TAX.TOTL.GD.ZS,
+    population_total = SP.POP.TOTL,
+    mobile_subscriptions_per_100 = IT.CEL.SETS.P2
+  )
+
+head(wdi_data)
+summary(wdi_data)
+```
+
+The function `WDI()` downloads the data directly from the World Bank API. The function `rename()` is used to rename the columns.
+
+Cleaning data:
+
+- Filter for relevant years only (1995-2022)
+- Select relevant columns (`country`, `year`, `gdp_current_usd`, `gdp_deflator_annual_pct`, `population_total`, `tax_revenue_pct_gdp`, `mobile_subscriptions_per_100`)
+
+
+```{r}
+#| label: clean-data
+
+
+wdi_data_clean <- wdi_data |>
+  filter(year >= 1995 & year <= 2022) |>
+  select(country, year, gdp_current_usd, gdp_deflator_annual_pct, population_total, tax_revenue_pct_gdp, mobile_subscriptions_per_100)
+
+head(wdi_data_clean)
+summary(wdi_data_clean)
+```
+
+### **Exercise 1** 
+
+Calculate the deflator for the base year **2015** for each country
+
+Change the deflator base year to from 2020 to **2015**:
+
+$$
+Deflator_{2015} = \frac{Deflator_{t}}{Deflator_{2015}} \times 100
+$$
+
+where t=1995,...,2022
+
+```{r}
+#| label: exercise-1
+
+wdi_data_clean <- wdi_data_clean |>
+  group_by(country) |>
+  mutate(
+    gdp_deflator_base_2015 = (gdp_deflator_annual_pct / gdp_deflator_annual_pct[year == 2015]) * 100
+  ) |>
+  ungroup()
+head(wdi_data)
+```
+
+The `mutate()` function is used to create a new columns in a data frame. The `group_by()` function is used to group the data by country, so that the calculations are done for each country separately. The `ungroup()` function is used to remove the grouping structure.
+
+### **Exercise 2** 
+
+Calculate the GDP at **2015** prices for each country
+
+Change the GDP current to 2015 prices:
+
+$$
+GDP_{2015} = \frac{GDP_{current}}{Deflator_{2015}} \times 100
+$$
+
+where t=1995,...,2022
+
+```{r}
+#| label: exercise-2
+
+wdi_data_clean <- wdi_data_clean |>
+  mutate(
+    gdp_2015_usd = (gdp_current_usd / gdp_deflator_base_2015) * 100
+  )
+```
+
+### **Exercise 3** 
+Chart the evolution of GDP per capita variation and subscriptions over time *(for one country only)*
+
+1. Calculate GDP per capita at 2015 prices
+
+$$
+GDP_{per capita 2015} = \frac{GDP_{2015}}{Population_{total}}
+$$
+
+
+```{r}
+#| label: select France
+
+wdi_data_clean <- wdi_data_clean |>
+  mutate(
+    gdppc = gdp_2015_usd / population_total
+  )
+
+wdi_data_france <- wdi_data_clean |>
+  filter(country == "France")
+```
+
+2. Calculate the annual variation of GDP per capita at 2015 prices
+
+$$
+\Delta GDPpc = GDPpc_{t} - GDPpc_{t-1}
+$$
+
+where t=1996,...,2022
+
+```{r}
+#| label: exercise-3
+
+wdi_data_france <- wdi_data_france |>
+  arrange(year) |>
+  mutate(
+    gdppc_var = gdppc - lag(gdppc)
+  )
+```
+
+3. Chart the evolution of GDP per capita variation and subscriptions over time for France
+
+```{r}
+#| label: plot-exercise-3
+
+# Plot 1: GDP per capita variation over time
+ggplot(wdi_data_france, aes(x = year, y = gdppc_var)) +
+    geom_line(color = "blue", size = 1) +
+    geom_point(color = "darkblue", size = 4) +
+    labs(
+        title = "GDP per capita variation over time - France",
+        x = "Year",
+        y = "GDP per capita variation (USD)"
+    ) +
+    theme_minimal()
+
+# Plot 2: Mobile subscriptions per 100 people over time
+ggplot(wdi_data_france, aes(x = year, y = mobile_subscriptions_per_100)) +
+    geom_line(color = "red", size = 1) +
+    geom_point(color = "darkred", size = 4) +
+    labs(
+        title = "Mobile subscriptions per 100 people over time - France",
+        x = "Year",
+        y = "Mobile subscriptions per 100 people"
+    ) +
+    theme_minimal()
+```
+
+### **Exercise 4** 
+
+Is there any relationship between GDP per capita and subscriptions? *(for each country)*
+
+1. Using a scatter plot, for each country, plot GDP per capita at 2015 prices against mobile subscriptions per 100 people.
+
+```{r}
+#| label: plot-exercise-4
+
+ggplot(wdi_data_clean, aes(x = mobile_subscriptions_per_100, y = gdppc)) +
+    geom_point(aes(color = country), size = 2) +
+    labs(
+        title = "GDP per capita vs Mobile subscriptions per 100 people",
+        x = "Mobile subscriptions per 100 people",
+        y = "GDP per capita (2015 prices)"
+    ) +
+    theme_minimal()
+```
+
+Adding a linear regression to each country:
+
+```{r}
+#| label: plot-exercise-4-regression
+
+ggplot(wdi_data_clean, aes(x = mobile_subscriptions_per_100, y = gdppc)) +
+    geom_point(aes(color = country), size = 2) +
+    geom_smooth(aes(color = country), method = "lm", se = FALSE) +
+    labs(
+        title = "GDP per capita vs Mobile subscriptions per 100 people with regression lines",
+        x = "Mobile subscriptions per 100 people",
+        y = "GDP per capita (2015 prices)"
+    ) +
+    theme_minimal()
+```
+
+If flat, no relationship. If upward sloping, positive relationship. If downward sloping, negative relationship.
+
+Answering the same question using correlation (pearson correlation):
+
+```{r}
+#| label: correlation-exercise-4
+
+wdi_data_clean %>%
+  group_by(country) %>%
+  summarize(correlation = cor(gdppc, mobile_subscriptions_per_100, use = "complete.obs"))
+```
+
+The `cor()` function is used to calculate the correlation between two variables. The `use = "complete.obs"` argument is used to handle missing values by only using complete observations.
+
+
+### **Exercise 5**
+
+Calculate the two statistical moments for all variables *(France only)*
+
+```{r}
+#| label: moments-exercise-5
+
+#unselect the  country and year columns
+
+wdi_data_france_ <- wdi_data_france %>%
+  select(-country, -year)
+
+library(psych)
+
+describe(wdi_data_france_)
+```
+
+Check for the existence of **outliers** for each variable *(France only)*
+
+#### **Formulae for Outlier Detection**
+
+$$
+{IQR = Q3 - Q1}
+$$
+
+$$
+{Lower\;Limit = Q1 - 1.5 \times IQR}
+$$
+
+$$
+{Upper\;Limit = Q3 + 1.5 \times IQR}
+$$
+
+```{r}
+#| label: outliers-exercise-5
+
+wdi_data_france_outliers <- wdi_data_france_ %>%
+  gather(key = "variable", value = "value")
+head(wdi_data_france_outliers)
+wdi_data_france_outliers_summary <- wdi_data_france_outliers %>%
+  group_by(variable) %>%
+  summarize(
+    Q1 = quantile(value, 0.25, na.rm = TRUE),
+    Q3 = quantile(value, 0.75, na.rm = TRUE),
+    IQR = IQR(value, na.rm = TRUE),
+    Lower_Limit = Q1 - 1.5 * IQR,
+    Upper_Limit = Q3 + 1.5 * IQR
+  )
+wdi_data_france_outliers_summary
+```
+
+If values are below the Lower Limit or above the Upper Limit, they are considered outliers.
+
+```{r}
+
+# Identify outliers
+wdi_data_france_outliers <- wdi_data_france_outliers %>%
+  left_join(wdi_data_france_outliers_summary, by = "variable") %>%
+  mutate(
+    is_outlier = ifelse(value < Lower_Limit | value > Upper_Limit, TRUE, FALSE)
+  )
+
+#count number of outliers for each variable
+wdi_data_france_outliers %>%
+  group_by(variable) %>%
+  summarize(num_outliers = sum(is_outlier, na.rm = TRUE))
+ 
+```
+
+Boxplot for each variable *(France only)*
+
+
+```{r}
+#| label: boxplots-exercise-5
+
+library(gridExtra)
+
+# Create individual boxplots for each variable with colors
+p1 <- wdi_data_france %>%
+    ggplot(aes(x = "", y = gdp_current_usd)) +
+    geom_boxplot(fill = "lightblue", color = "darkblue") +
+    labs(title = "GDP Current USD", x = "", y = "Value") +
+    theme_minimal()
+
+p2 <- wdi_data_france %>%
+    ggplot(aes(x = "", y = gdp_deflator_annual_pct)) +
+    geom_boxplot(fill = "lightgreen", color = "darkgreen") +
+    labs(title = "GDP Deflator Annual %", x = "", y = "Value") +
+    theme_minimal()
+
+p3 <- wdi_data_france %>%
+    ggplot(aes(x = "", y = population_total)) +
+    geom_boxplot(fill = "lightcoral", color = "darkred") +
+    labs(title = "Population Total", x = "", y = "Value") +
+    theme_minimal()
+
+p4 <- wdi_data_france %>%
+    ggplot(aes(x = "", y = tax_revenue_pct_gdp)) +
+    geom_boxplot(fill = "lightyellow", color = "orange") +
+    labs(title = "Tax Revenue % GDP", x = "", y = "Value") +
+    theme_minimal()
+
+p5 <- wdi_data_france %>%
+    ggplot(aes(x = "", y = mobile_subscriptions_per_100)) +
+    geom_boxplot(fill = "lightpink", color = "purple") +
+    labs(title = "Mobile Subscriptions per 100", x = "", y = "Value") +
+    theme_minimal()
+
+p6 <- wdi_data_france %>%
+    ggplot(aes(x = "", y = gdppc)) +
+    geom_boxplot(fill = "lightgray", color = "black") +
+    labs(title = "GDP per Capita", x = "", y = "Value") +
+    theme_minimal()
+
+# Arrange plots in a grid
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 3, nrow = 2)
+```
+
+
+With another package:
+
+```{r}
+
+library(plotly)
+
+p1 <- plot_ly(y = wdi_data_france$gdp_current_usd, type = "box", name = "GDP Current USD", boxpoints = "all", jitter = 0.3, pointpos = -1.8, marker = list(color = 'darkblue'), line = list(color = 'blue'))
+p2 <- plot_ly(y = wdi_data_france$gdp_deflator_annual_pct, type = "box", name = "GDP Deflator Annual %", boxpoints = "all", jitter = 0.3, pointpos = -1.8, marker = list(color = 'darkgreen'), line = list(color = 'green'))
+p3 <- plot_ly(y = wdi_data_france$population_total, type = "box", name = "Population Total", boxpoints = "all", jitter = 0.3, pointpos = -1.8, marker = list(color = 'darkred'), line = list(color = 'red'))
+p4 <- plot_ly(y = wdi_data_france$tax_revenue_pct_gdp, type = "box", name = "Tax Revenue % GDP", boxpoints = "all", jitter = 0.3, pointpos = -1.8, marker = list(color = 'orange'), line = list(color = 'yellow'))
+p5 <- plot_ly(y = wdi_data_france$mobile_subscriptions_per_100, type = "box", name = "Mobile Subscriptions per 100", boxpoints = "all", jitter = 0.3, pointpos = -1.8, marker = list(color = 'purple'), line = list(color = 'pink'))
+p6 <- plot_ly(y = wdi_data_france$gdppc, type = "box", name = "GDP per Capita", boxpoints = "all", jitter = 0.3, pointpos = -1.8, marker = list(color = 'black'), line = list(color = 'gray'))
+
+subplot(p1, p2, p3, p4, p5, p6, nrows = 2, margin = 0.05) %>%
+  layout(title = "Boxplots for France Variables")
+```

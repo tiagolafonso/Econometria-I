@@ -1,0 +1,190 @@
+---
+title: "Class2 - Introduction to R"
+format: md
+author: "Tiago Afonso"
+date: "today"
+toc: true
+---
+
+# Calculations in R
+
+Perform simple mathematical **calculations**:
+
+
+```{r}
+2+2
+```
+
+Assign values to variables:
+
+```{r}
+a <- 2
+b <- 3
+```
+
+Perform calculations with variables:
+
+```{r}
+a + b
+a * b
+```
+
+# Introducing data
+
+## manually
+
+Clear the environment:
+
+```{r}
+rm(list = ls())
+```
+
+Create a vector:
+
+```{r}
+v1 <- c(1, 2, 3, 4, 5)
+v2 <- c(6, 7, 8, 9, 10)
+```
+
+Create a `data.frame` (table):
+
+```{r}
+dados <- data.frame(v1, v2)
+```
+
+## Import .csv file
+
+Clear data:
+```{r}
+rm(list = ls())
+```
+
+Load libraries:
+
+
+```{r}
+library(readxl) # for Excel files
+library(tidyverse) # for data manipulation
+```
+
+Import .csv file:
+
+
+```{r}
+dados <- read.csv("Data.csv")
+```
+
+Remove unnecessary columns:
+
+```{r}
+dados2 <- dados |> 
+    select(-"Country.Code", -"Time.Code")
+```
+
+View column names:
+
+```{r}
+colnames(dados2)
+```
+
+Simplify column names:
+
+```{r}
+dados2 <- dados2 |> 
+    rename(
+    Country = "Country.Name",
+    Year = "Time",
+    tariff = "Tariff.rate..applied..simple.mean..all.products......TM.TAX.MRCH.SM.AR.ZS.",
+    tarif_man = "Tariff.rate..applied..simple.mean..manufactured.products......TM.TAX.MANF.SM.AR.ZS.",
+    gdp = "GDP..constant.LCU...NY.GDP.MKTP.KN.",
+    trade = "Trade....of.GDP...NE.TRD.GNFS.ZS.",
+    x = "Exports.of.goods.and.services..constant.LCU...NE.EXP.GNFS.KN.",
+    m = "Imports.of.goods.and.services..constant.LCU...NE.IMP.GNFS.KN."
+    )
+```
+
+Filter rows for year>=2000 and year<=2022:
+
+```{r}
+dados2 <- dados2 |> 
+    filter(Year >= 2000 & Year <= 2022)
+```
+
+## Calculations between columns of a data.frame
+
+Calculate trade openness:
+
+$$
+openess_t = \frac{x_t + m_t}{gdp_t}
+$$
+
+Calculate in R with `mutate()`:
+
+```{r}
+dados2 <- dados2 |> 
+    mutate(openess = (x + m) / gdp)
+```
+
+
+# Graphics
+
+## Line plot
+
+Plot of GDP evolution over time:
+
+```{r}
+ggplot(dados2, aes(x = Year, y = gdp)) +
+    geom_line() +
+    labs(title = "GDP Evolution Over Time",
+         x = "Year",
+         y = "GDP (LCU)") +
+    theme_minimal()
+```
+
+Scatter plot between GDP and economic openness:
+
+```{r}
+ggplot(dados2, aes(x = openess, y = gdp)) +
+    geom_point(color="steelblue",size=4) +
+    labs(title = "GDP vs Trade Openness",
+         x = "Trade Openness",
+         y = "GDP (LCU)") +
+    theme_minimal()
+```
+
+Scatter with a regression line:
+
+```{r}
+ggplot(dados2, aes(x = openess, y = gdp)) +
+    geom_point(color="steelblue",size=4) +
+    geom_smooth(method = "lm", se = FALSE, color = "darkorange", size=3) +
+    labs(title = "GDP vs Trade Openness",
+         x = "Trade Openness",
+         y = "GDP (LCU)") +
+    theme_minimal()
+```
+
+Histogram of exports (`x`): 
+
+```{r}
+ggplot(dados2, aes(x = gdp)) +
+    geom_histogram(fill = "steelblue", color = "white") +
+    labs(title = "Distribution of GDP",
+         x = "GDP (LCU)",
+         y = "Frequency") +
+    theme_minimal()
+```
+
+
+# Descriptive Statistics
+
+```{r}
+summary(dados2)
+```
+
+# Types of data in Econometrics
+
+- Cross-sectional data: multiple entities, 1 time period
+- Time series: 1 entity, multiple time periods
+- Panel data: multiple entities, multiple time periods
+
